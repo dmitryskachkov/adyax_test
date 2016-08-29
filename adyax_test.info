@@ -1,0 +1,11 @@
+name = Adyax test
+description = Test module for create Vimeo field type.
+core = 7.x
+package = Test
+version = "7.x-0.1"
+core = "7.x"
+project = "adyax"
+files[] = adyax_test.module
+dependencies[] = ctools
+dependencies[] = features
+dependencies[] = panels

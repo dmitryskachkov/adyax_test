@@ -1,0 +1,179 @@
+<?php
+/**
+ * @file adyax_test.module
+ * Adyax test module.
+ */
+
+/**
+ * Implements hook_field_schema().
+ */
+function adyax_test_field_schema($field) {
+  return array(
+    'columns' => array(
+      'vimeo_id' => array(
+        'type' => 'varchar',
+        'length' => 22,
+        'not null' => FALSE,
+      ),
+      'vimeo_url' => array(
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => FALSE,
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_info().
+ */
+function adyax_test_field_info() {
+  return array(
+    'vimeo_url' => array(
+      'label' => t('Vimeo url'),
+      'description' => t('This field stores vimeo url in the database.'),
+      'default_widget' => 'vimeo_field',
+      'default_formatter' => 'vimeo_default',
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_widget_info().
+ */
+function adyax_test_field_widget_info() {
+  return array(
+    'vimeo_field' => array(
+      'label' => t('Text field'),
+      'field types' => array('vimeo_url'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_settings_form().
+ */
+function adyax_test_field_settings_form($field, $instance, $has_data) {
+  $settings = $field['settings'];
+  $form = array();
+  return $form;
+}
+
+/**
+ * Implements hook_field_instance_settings_form().
+ */
+function adyax_test_field_instance_settings_form($field, $instance) {
+  $settings = $instance['settings'];
+  $form = array();
+  return $form;
+}
+
+
+/**
+ * Implements hook_field_widget_form().
+ */
+function adyax_test_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  switch ($instance['widget']['type']) {
+    case 'vimeo_field' :
+
+      $element['vimeo_url'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Url'),
+        '#default_value' => isset($items[$delta]['vimeo_url']) ? $items[$delta]['vimeo_url'] : '',
+        '#size' => 80,
+      );
+      break;
+  }
+  return $element;
+}
+
+/**
+ * Implements hook_field_presave().
+ */
+function adyax_test_field_presave($entity_type, $entity, $field, $instance, $langcode, &$items) {
+  foreach ($items as $delta => $item) {
+    if (isset($item['vimeo_url'])) {
+      $items[$delta]['vimeo_url'] = $item['vimeo_url'];
+      $items[$delta]['vimeo_id'] = _vimeo_url_to_id($item['vimeo_url']);
+    }
+  }
+}
+
+function _vimeo_url_to_id($url) {
+  try {
+    //If you want, you can store API path in variable
+    $url = "http://vimeo.com/api/oembed.json?url=" . $url;
+    $json = file_get_contents($url);
+    $json_data = json_decode($json, TRUE);
+
+    return $json_data["video_id"];
+  }
+  catch (Exception $e) {
+    watchdog('adyax_test', 'Cant get id from vimeo api:' . ' ' . $e->getMessage());
+  }
+}
+
+/**
+ * Implements hook_field_is_empty().
+ */
+function adyax_test_field_is_empty($item, $field) {
+  if (empty($item['vimeo_url'])) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_field_validate().
+ */
+function adyax_test_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+  foreach ($items as $delta => $item) {
+    if (!empty($item['vimeo_url'])) {
+      if (!valid_url($item['vimeo_url'], TRUE)) {
+        $errors[$field['field_name']][$langcode][$delta][] = array(
+          'error' => t('Invalid url.'),
+          'message' => t('%url: url is invalid. Check your vimeo video url.', array('%url' => $item['vimeo_url'])),
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function adyax_test_field_formatter_info() {
+  return array(
+    'vimeo_default' => array(
+      'label' => t('Default'),
+      'field types' => array('vimeo_url'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function adyax_test_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+  switch ($display['type']) {
+    case 'vimeo_default' :
+      foreach ($items as $delta => $item) {
+        if (isset($item['vimeo_url'])) {
+          //Show video in iframe window
+          $element[$delta]['#markup'] = '<iframe src="https://player.vimeo.com/video/' . $item['vimeo_id'] . '?color=cdbeaa&title=0&byline=0&portrait=0" width="320" height="200" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>';
+        }
+      }
+      break;
+  }
+  return $element;
+}
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function adyax_test_ctools_plugin_directory($module, $plugin) {
+  if ($module == 'ctools' && !empty($plugin)) {
+    return 'plugins/' . $plugin;
+  }
+}
